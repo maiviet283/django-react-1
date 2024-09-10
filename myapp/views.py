@@ -1,25 +1,25 @@
 from rest_framework import status
-from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.response import Response
 from rest_framework.permissions import AllowAny,IsAuthenticated
-from rest_framework_simplejwt.exceptions import TokenError,InvalidToken
-from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.tokens import RefreshToken
-from .serializers import StudentsSerializer
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.exceptions import TokenError,InvalidToken
 from .models import Students
+from .serializers import StudentsSerializer
 from django.contrib.auth.hashers import make_password,check_password
 
 
 class RegisterView(APIView):
     permission_classes = [AllowAny]
 
-    def post(self, request):
+    def post(self,request):
         serializer = StudentsSerializer(data=request.data)
         if serializer.is_valid():
-            user = serializer.save(password=make_password(request.data.get('password')))
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+            serializer.save(password=make_password(request.data.get('password')))
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST) 
+
 
 class LoginView(APIView):
     permission_classes = [AllowAny]
@@ -30,14 +30,14 @@ class LoginView(APIView):
 
         try:
             user = Students.objects.get(username=username)
-            
+
             if check_password(password,user.password):
                 refresh_token = RefreshToken.for_user(user)
                 access_token = refresh_token.access_token
-                
+
                 access_token["id"] = user.id
                 access_token["username"] = user.username
-
+                
                 return Response({
                     'id':user.id,
                     'username':user.username,
@@ -46,10 +46,10 @@ class LoginView(APIView):
                 })
             
             else:
-                return Response({'error':'Tên đăng nhập hoặc mật khẩu không đúng'}, status=status.HTTP_400_BAD_REQUEST)
-        
+                return Response({'error':'Tên đăng nhập hoặc mật khẩu không đúng'},status=status.HTTP_400_BAD_REQUEST)
+            
         except Students.DoesNotExist:
-            return Response({'error':'Sai Tên Đăng Nhập'}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response({'error':'Sai Username'}, status=status.HTTP_401_UNAUTHORIZED)
         
 
 class CustomJWTAuthentication(JWTAuthentication):
@@ -66,7 +66,7 @@ class UserDetailView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [CustomJWTAuthentication]
 
-    def get(self, request, *args, **kwargs):
+    def get(self, request):
         user = request.user
         serializer = StudentsSerializer(user)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -108,7 +108,7 @@ class UpdateUserView(APIView):
 
         if 'password' in data:
             data['password'] = make_password(data['password'])
-            serializer = StudentsSerializer(instance=user, data=data, partial=True)  # Re-serialize với password đã mã hóa
+            serializer = StudentsSerializer(instance=user, data=data, partial=True)
         
         # Lưu thay đổi sau khi kiểm tra xong
         serializer.save()
